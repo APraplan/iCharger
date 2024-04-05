@@ -201,11 +201,11 @@ def get_info():
 
 if __name__ == "__main__":
     
-    if len(sys.argv) < 1:
+    if len(sys.argv) < 2:
         print("Not enough arguments provided.")
         print("Usage: Modbus.py <command> [start, stop, status]")
         sys.exit()
-    elif len(sys.argv) > 3:
+    elif len(sys.argv) > 2:
         print("Too many arguments provided.")
         print("Usage: Modbus.py <command> [start, stop, status]")
         sys.exit()

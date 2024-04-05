@@ -1,6 +1,7 @@
 import hid
 import struct
 import time
+import sys
 from Modbus_def import *
 
 def print_bytearray(bytearray):
@@ -199,22 +200,35 @@ def get_info():
 
 
 if __name__ == "__main__":
+    
+    if len(sys.argv) < 1:
+        print("Not enough arguments provided.")
+        print("Usage: Modbus.py <command> [start, stop, status]")
+        sys.exit()
+    elif len(sys.argv) > 3:
+        print("Too many arguments provided.")
+        print("Usage: Modbus.py <command> [start, stop, status]")
+        sys.exit()
+    else:
+        
+        command = sys.argv[1]
+    
+    
     device_info = find_device(VENDOR_ID, PRODUCT_ID)
     
     if device_info:
-        print("Device found. Opening...")
+        # print("Device found. Opening...")
         device = hid.device()
         device.open(VENDOR_ID, PRODUCT_ID)
         print("Device opened.")
         
-        # control(Operation.CHARGE, Order.RUN)
-        
-        # get_info()
-
-
-        
-
-        
+        if command == "start":
+            control(Operation.CHARGE, Order.RUN)
+        elif command == "stop":
+            control(Operation.CHARGE, Order.STOP)
+        elif command == "status":
+            get_info() 
+   
         device.close()
     else:
         print("Device not found.")

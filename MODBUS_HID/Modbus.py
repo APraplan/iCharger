@@ -14,6 +14,21 @@ def format_command(command):
         # print_bytearray(bytearray_command)
     return bytearray_command
 
+def format_u16(value, dot):
+        
+    if dot == 1:
+        formatted_value = "{:.1f}".format(value / 10)
+    elif dot == 2:
+        formatted_value = "{:.2f}".format(value / 100)
+    elif dot == 3:
+        formatted_value = "{:.3f}".format(value / 1000)
+    elif dot == 4:
+        formatted_value = "{:.4f}".format(value / 10000)
+    else:
+        formatted_value = "{}".format(value)
+        
+    return formatted_value
+
 def find_device(vendor_id, product_id):
     for device_dict in hid.enumerate():
         if device_dict['vendor_id'] == vendor_id and device_dict['product_id'] == product_id:
@@ -22,7 +37,7 @@ def find_device(vendor_id, product_id):
 
 def MasterModBus(device, FunCode, pIn, pOut):
     
-    print(type(pIn))
+    # print(type(pIn))
 
     HidBuf = bytearray(HID_PACK_MAX + 1)
     HidBuf[HID_PACK_CH] = REPORT_ID
@@ -46,8 +61,8 @@ def MasterModBus(device, FunCode, pIn, pOut):
     HidBuf = HidBuf[:HID_PACK_MAX + 1]
 
     # Write HID packet
-    print("Write: ")
-    print_bytearray(HidBuf)
+    # print("Write: ")
+    # print_bytearray(HidBuf)
     if not device.write(HidBuf):
         return MBErrorCode.MB_EIO
 
@@ -59,8 +74,8 @@ def MasterModBus(device, FunCode, pIn, pOut):
     if not HidBuf:
         return MBErrorCode.MB_ETIMEDOUT
     
-    print("Read: ")
-    print_bytearray(HidBuf)
+    # print("Read: ")
+    # print_bytearray(HidBuf)
 
     # Validate response length
     if HidBuf[HID_PACK_LEN] > HID_PACK_MAX:
@@ -72,8 +87,7 @@ def MasterModBus(device, FunCode, pIn, pOut):
                 return MBErrorCode.MB_ELEN
             else:
                 for i in range(0, HidBuf[HID_PACK_MODBUS+1], 2):
-                    pOut[i] = HidBuf[HID_PACK_MODBUS + 2 + i + 1]
-                    pOut[i + 1] = HidBuf[HID_PACK_MODBUS + 2 + i]
+                    pOut.extend([HidBuf[HID_PACK_MODBUS + 2 + i + 1], HidBuf[HID_PACK_MODBUS + 2 + i]])
             
         elif HidBuf[HID_PACK_MODBUS] == MBFunctions.MB_FUNC_WRITE_MULTIPLE_REGISTERS:                                       # Modbus function 0x10 Write Multiple Registers
             HidBuf[HID_PACK_LEN] = 0+5+(HidBuf[HID_PACK_MODBUS+5]*2+1)	
@@ -85,10 +99,11 @@ def MasterModBus(device, FunCode, pIn, pOut):
     
     return MBErrorCode.MB_EOK
 
-def MasterRead(ReadType, RegStart, RegCount):
+def MasterRead(RegStart, RegCount):
    
     pOut = bytearray()
-    FunCode = MBFunctions.MB_FUNC_READ_HOLDING_REGISTER if ReadType == 0 else MBFunctions.MB_FUNC_READ_INPUT_REGISTER
+    FunCode = MBFunctions.MB_FUNC_READ_HOLDING_REGISTER if RegStart > 0x8000 else MBFunctions.MB_FUNC_READ_INPUT_REGISTER
+    # print("FunCode: ", FunCode)
     
     total_bytes = RegCount * 2  # Assuming each register is 2 bytes
     read_bytes = 0
@@ -106,7 +121,7 @@ def MasterRead(ReadType, RegStart, RegCount):
         
         ret = MasterModBus(device, FunCode, InBuf, pOut)
         if ret != MBErrorCode.MB_EOK:
-            return ret, pOut[:total_bytes]
+            return ret, pOut
         
         # Assuming MasterModBus appends the read data to a global `pOut`
         # You might need to adjust this part depending on how MasterModBus is implemented
@@ -115,7 +130,7 @@ def MasterRead(ReadType, RegStart, RegCount):
 
     # At this point, `pOut` should contain the data read
     # Depending on your implementation, you might need to return or process `pOut` further
-    return MBErrorCode.MB_EOK, pOut[:total_bytes]
+    return MBErrorCode.MB_EOK, pOut
 
 def MasterWrite(RegStart, RegCount, pIn):
 
@@ -151,6 +166,38 @@ def MasterWrite(RegStart, RegCount, pIn):
 
     return MBErrorCode.MB_EOK
 
+def control(operation, order):
+        
+        command = [operation, Select_memory.PROGRAM_0, Select_channel.CHANNEL_1, Order_lock.UNLOCK, order]
+        command = format_command(command)
+        ret = MasterWrite(CONTROL_REGISTERS, len(command)//2, command)
+        print("Writing return code: ", ret)
+        
+
+def get_info():
+    
+    ret, voltages = MasterRead(INPUT_READ_ONLY + CELL_VOLTAGE, 12)
+    ret, internal_res = MasterRead(INPUT_READ_ONLY + CELL_INTERNAL_RESISTANCE, 12)
+    
+    print("")
+    print("Cell information:")
+    print("")
+    
+    for i in range(0, len(internal_res), 2):
+        value = struct.unpack("<H", voltages[i:i+2])[0]
+        formatted_voltage = format_u16(value, 3)
+        
+        value = struct.unpack("<H", internal_res[i:i+2])[0]
+        formatted_res = format_u16(value, 1)
+        
+        print("     Cell ", i//2+1, " Voltage: ", formatted_voltage, ", Internal resistance: ", formatted_res, " mOhm")
+        
+    ret, internal_res = MasterRead(INPUT_READ_ONLY + LINE_INTERNAL_RESISTANCE, 1)
+    print("Line internal resistance: ", format_u16(struct.unpack("<H", internal_res)[0], 1), " mOhm")
+
+    print("")
+
+
 if __name__ == "__main__":
     device_info = find_device(VENDOR_ID, PRODUCT_ID)
     
@@ -159,12 +206,15 @@ if __name__ == "__main__":
         device = hid.device()
         device.open(VENDOR_ID, PRODUCT_ID)
         print("Device opened.")
+        
+        # control(Operation.CHARGE, Order.RUN)
+        
+        # get_info()
 
-        print("Writing registers...")
-        command = [Operation.ONLY_BALANCE, Select_memory.PROGRAM_0, Select_channel.CHANNEL_1, Order_lock.UNLOCK, Order.STOP]
-        ret = MasterWrite(CONTROL_REGISTERS, len(command)//2, command)
-        print("Writing return code: ", ret)
-    
+
+        
+
+        
         device.close()
     else:
         print("Device not found.")

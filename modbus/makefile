@@ -1,3 +1,8 @@
+# For hidapi
+# sudo apt install cmake.
+# cmake create config: cmake ..
+# cmake build: cmake --build . --config Release
+
 # Detect the operating system
 UNAME_S := $(shell uname -s)
 
@@ -25,7 +30,7 @@ EXECUTABLE := X12
 # Setting up platform-specific variables
 ifeq ($(UNAME_S), Linux)
     # Linux specific code
-    LDFLAGS += -L../hidapi/build/src/linux/Release -lhidapi
+    LDFLAGS += -L../hidapi/build/src/linux -lhidapi-hidraw
     OS_MESSAGE := "Working on Linux"
     OS_SUPPORTED := yes
 endif

@@ -18,18 +18,18 @@ using namespace std;
 
 
 // Need to implement the same thing with the hid api lib
-#include <iomanip>
-void DisplayArrayInHex(const uint8_t* array, size_t length) {
-    printf("Array in hex: [");
-    for (size_t i = 0; i < length; ++i) {
-        // Print each byte in hex format
-        printf("%02x", static_cast<int>(array[i]));
-        if (i < length - 1) {
-            printf(", ");
-        }
-    }
-    printf("]\n");
-}
+// #include <iomanip>
+// void DisplayArrayInHex(const uint8_t* array, size_t length) {
+//     printf("Array in hex: [");
+//     for (size_t i = 0; i < length; ++i) {
+//         // Print each byte in hex format
+//         printf("%02x", static_cast<int>(array[i]));
+//         if (i < length - 1) {
+//             printf(", ");
+//         }
+//     }
+//     printf("]\n");
+// }
 
 
 class hid_dev {
@@ -39,13 +39,14 @@ private:
 public:
     hid_dev() {
         // Initialize the hidapi library
-		printf("Hid init\n");
+		// printf("Hid init\n");
         hid_init();
 
         // Open the device using the VID, PID, and optionally the Serial number.
         handle = hid_open(0x0483, 0x5751, NULL);
         if (!handle) {
             printf("Unable to open device\n");
+			printf("Try with sudo rights\n");
             hid_exit();
         }
     }
@@ -56,10 +57,11 @@ public:
         hid_exit();
     }
 
-    bool read(uint8_t* buffer, size_t length) {
-        int res = hid_read(handle, buffer, length);
-        return (res >= 0);
-    }
+bool read(uint8_t* buffer, size_t length) {
+	buffer[0] = 0x00; // Add 0x00 at the beginning of the buffer
+	int res = hid_read_timeout(handle, buffer + 1, length, TIMEOUT);
+	return (res >= 0);
+}
 
     bool write(const uint8_t* buffer, size_t length) {
         int res = hid_write(handle, buffer, length);
@@ -69,14 +71,14 @@ public:
 
 hid_dev device;
 
-eMBErrorCode MasterRead(uint8_t ReadType,uint32_t RegStart,uint32_t RegCount,uint8_t *pOut)
+eMBErrorCode MasterRead(uint32_t RegStart,uint32_t RegCount,uint8_t *pOut)
 {
 	eMBErrorCode ret;
 	uint32_t i;
 	uint8_t InBuf[16];
 	uint8_t FunCode;
 
-	if(ReadType==0)
+	if(RegStart >= 0x7fff)
 		FunCode = MB_FUNC_READ_HOLDING_REGISTER;
 	else
 		FunCode = MB_FUNC_READ_INPUT_REGISTER;
@@ -191,12 +193,12 @@ eMBErrorCode MasterModBus(uint8_t FunCode,uint8_t *pIn,uint8_t *pOut,uint32_t ms
 
 	//trans
 	// if(JsHID.Write(HidBuf,HID_PACK_MAX+1)==FALSE)return MB_EIO;
-	printf("MasterModBus write\n");
-    DisplayArrayInHex(HidBuf, HID_PACK_MAX+1);
+	// printf("MasterModBus write\n");
+    // DisplayArrayInHex(HidBuf, HID_PACK_MAX+1);
     if (!device.write(HidBuf, HID_PACK_MAX+1)) return MB_EIO;
 	HidBuf[HID_PACK_CH]=REPORT_ID;
     if (!device.read(HidBuf, HID_PACK_MAX+1)) return MB_ETIMEDOUT;
-    DisplayArrayInHex(HidBuf, HID_PACK_MAX+1);
+    // DisplayArrayInHex(HidBuf, HID_PACK_MAX+1);
 	// if(JsHID.Read(HidBuf,HID_PACK_MAX+1,ms)==FALSE)return MB_ETIMEDOUT;
 	if(HidBuf[HID_PACK_LEN] > HID_PACK_MAX)return MB_ELEN;
 	

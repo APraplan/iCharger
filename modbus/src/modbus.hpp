@@ -4,6 +4,8 @@
 
 #define MB_HID_PROTOCOL_ID	0x30
 
+#define TIMEOUT 1000
+
 //ModBus HID ADU pack
 //Len(1byte)+Type(1byte)+ModBus PDU
 //Type=MB_HID_PROTOCOL_ID 0x30
@@ -53,6 +55,7 @@ typedef enum
 #define MB_FUNC_ERROR                         ( 128 )
 
 eMBErrorCode MasterModBus(uint8_t FunCode,uint8_t *pIn,uint8_t *pOut,uint32_t ms);
-eMBErrorCode MasterRead(uint8_t ReadType,uint32_t RegStart,uint32_t RegCount,uint8_t *pOut);
+eMBErrorCode MasterRead(uint32_t RegStart,uint32_t RegCount,uint8_t *pOut);
 eMBErrorCode MasterWrite(uint32_t RegStart,uint32_t RegCount,uint8_t *pIn);
 
+void DisplayArrayInHex(const uint8_t* array, size_t length);
